@@ -40,8 +40,8 @@ p_load(tidyverse,
 
 <div class="alert alert-info">
   <strong>Group Members:</strong> 
-1. Jian Hao Chiah, 216031965
-2. Isanna Biglands, 218887273
+1. Jian Hao Chiah, 216031965.
+2. Isanna Biglands, 218887273.
 </div>
 
 ## Introduction 
