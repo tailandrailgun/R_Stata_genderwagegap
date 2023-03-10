@@ -1,0 +1,240 @@
+---
+title: "LFS2019"
+author: "Jian Hao, Isanna"
+date: ''
+output:
+  pdf_document: default
+  html_document: default
+subtitle: OLS
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Set global R options
+#options("scipen"=10, "digits"=4)
+
+# kable
+options(knitr.kable.NA = '')
+
+# Set the graphical theme
+ggplot2::theme_set(ggplot2::theme_light())
+
+# load libraries -- install if required
+library(pacman)
+p_load(tidyverse,
+       dplyr,
+       oaxaca,
+       knitr,
+       ggplot2,
+       haven,
+       Hmisc,
+       survival,
+       Formula,
+       lattice,
+       matrixStats,
+       fastDummies,
+       magrittr)
+      
+```
+
+<div class="alert alert-info">
+  <strong>Group Members:</strong> 
+1. Jian Hao Chiah, 216031965
+2. Isanna Biglands, 218887273
+</div>
+
+# Part 1: Importing Data & Data Manipulation
+```{r, echo=TRUE}
+A19 <- read.csv("D:/Desktop/PROC A/Data/2019/1.csv") 
+B19 <- read.csv("D:/Desktop/PROC A/Data/2019/2.csv") 
+
+raw <- rbind(A19, B19)
+```
+
+```{r eval=T, echo=T}
+#Cleaning the data -- Part 1
+
+lfs <- raw %>% 
+  drop_na(FTPTMAIN) %>% 
+  drop_na(HRLYEARN) %>%
+  drop_na(PERMTEMP) %>%
+  mutate(hrlywage = HRLYEARN/100,
+         hours = UTOTHRS/10,
+         average_weekly_wage = hrlywage*hours,
+         lWAGE = log(average_weekly_wage),
+         FEMALE = ifelse(SEX == 2, 1, 0),
+         full_part = ifelse(FTPTMAIN == 2, 1, 0),
+         perm_temp = ifelse(PERMTEMP == 2, 1, 0)) 
+```
+```{r eval=T, echo=T}
+#Creating Dummies with more than 2 categories
+lfs <- dummy_cols(lfs, select_columns = c('AGE_12','MARSTAT','EDUC','IMMIG','CMA'),
+                  ignore_na = FALSE)
+
+```
+```{r eval=T, echo=T}
+df <- lfs %>% 
+  select(AGE_12, FEMALE, lWAGE, MARSTAT, EDUC, MJH, NAICS_21, UHRSMAIN, UTOTHRS, TENURE, UNION, SCHOOLN, AGYOWNK, FINALWT)
+
+FEMALE.f <- factor(df$FEMALE, labels=c("men", "women"))
+
+```
+
+# Part 2: Overlapping Density Plots based on Gender
+```{r eval=T, echo=T, results='hide'}
+# Log Wage by Gender
+df %>% 
+  mutate(FEMALE.f <- factor(FEMALE, labels = c("MEN","WOMEN")))
+```
+## Log Wage by Gender
+```{r eval=T, echo=T}
+ggplot(df, aes(x = lWAGE, y = ..density.., weight = FINALWT, fill = FEMALE.f)) +
+         geom_histogram(bins = 30, position = position_dodge(width = 0), alpha = 1) +
+  labs(x = "Log Wage", y = "Density", title = "Log(wage) by Gender") +
+  scale_x_log10() +
+  theme_classic()
+```
+
+## Highest Educational Attainment by Gender
+```{r eval=T, echo=T}
+# Highest Educational Attainment by Gender
+ggplot(df, aes(x = EDUC, y = ..density.., weight = FINALWT, fill = FEMALE.f)) +
+  geom_histogram(bins = 20, position = position_dodge(width = 0), alpha = 1) +
+  labs(x = "Highest Education Attainment", y = "Density", title = "Highest Educational Attainment by Gender") +
+  theme_classic()
+
+```
+
+# Part 3: Average wage differences
+## Avg.wage diff. by Gender
+```{r eval=T, echo=T}
+df.gen <- df %>% 
+  group_by(FEMALE) %>% 
+  summarise(mwage = weighted.mean(lWAGE, FINALWT),
+            median.wage = weightedMedian(lWAGE, FINALWT))
+
+df.gen
+```
+## Avg.wage diff. by Highest Educational Attainment
+```{r eval=T, echo=T}
+df.educ <- df %>% 
+  group_by(EDUC) %>% 
+  summarise(mean.wage = weighted.mean(lWAGE, FINALWT),
+            median.wage = weightedMedian(lWAGE, FINALWT))
+
+df.educ
+```
+# Part 4: Standard deviation for Log Wages
+## Std. Dev. for Log Wages by Gender
+```{r eval=T, echo=T}
+df.gen <- df %>% 
+  group_by(FEMALE) %>% 
+  summarise(std.dev.wage = sd(lWAGE, na.rm = F))
+
+df.gen
+```
+## Std. Dev. for Log Wages by Highest Educational Attainment
+```{r eval=T, echo=T}
+df.gen <- df %>% 
+  group_by(EDUC) %>% 
+  summarise(std.dev.wage = sd(lWAGE, na.rm = F))
+
+df.gen
+```
+# Part 5: Pooled Weighted OLS model
+```{r eval=T, echo=T}
+OLS <- lm(lWAGE ~ FEMALE
+             + AGE_12_1 
+             + AGE_12_2 
+             + AGE_12_3
+             + AGE_12_4
+             + AGE_12_5
+             + AGE_12_6
+             + AGE_12_7
+             + AGE_12_8
+             + AGE_12_9
+             + AGE_12_10
+             + AGE_12_11
+             + AGE_12_12
+             + MARSTAT_1
+             + MARSTAT_2
+             + MARSTAT_3
+             + MARSTAT_4
+             + MARSTAT_5
+             + MARSTAT_6
+             + EDUC_1
+             + EDUC_2
+             + EDUC_3
+             + EDUC_4
+             + EDUC_5
+             + EDUC_6
+             + IMMIG_1
+             + IMMIG_2
+             + IMMIG_3
+             + CMA_1
+             + CMA_1
+             + CMA_2
+             + CMA_3
+             + CMA_4
+             + CMA_5
+             + CMA_6
+             + CMA_7
+             + CMA_8
+             + CMA_9
+             + full_part, weight = FINALWT, data = lfs)
+
+summary(OLS)
+  
+```
+```{r eval=T, echo=T}
+summary(OLS)$r.squared
+```
+# Part 6: Oaxaca-Blinder Decomposition Method based on Gender
+```{r eval=F, echo=T, results='hide'}
+#explain differences in log real wages across gender
+OB <- oaxaca(formula = lWAGE ~ + AGE_12_1 
+             + AGE_12_2 
+             + AGE_12_3
+             + AGE_12_4
+             + AGE_12_5
+             + AGE_12_6
+             + AGE_12_7
+             + AGE_12_8
+             + AGE_12_9
+             + AGE_12_10
+             + AGE_12_11
+             + AGE_12_12
+             + MARSTAT_1
+             + MARSTAT_2
+             + MARSTAT_3
+             + MARSTAT_4
+             + MARSTAT_5
+             + MARSTAT_6
+             + EDUC_1
+             + EDUC_2
+             + EDUC_3
+             + EDUC_4
+             + EDUC_5
+             + EDUC_6
+             + IMMIG_1
+             + IMMIG_2
+             + IMMIG_3
+             + CMA_1
+             + CMA_1
+             + CMA_2
+             + CMA_3
+             + CMA_4
+             + CMA_5
+             + CMA_6
+             + CMA_7
+             + CMA_8
+             + CMA_9
+             + full_part + perm_temp | FEMALE, data = lfs, R = 100)
+
+print(OB)
+
+```
+
+
+
